@@ -1147,13 +1147,16 @@ class History(object):
         if self.b_until < len(self.batches):
             self.b_until += 1
 
-    def learning_curves(self, who=None, online=False):
+    def learning_curves(self, who=None, online=False, posterior=False):
         """
         Extract learning curves (skill over time) for players.
         
         Args:
             who: List of player names to extract (default: None, returns all)
-            online: Use online estimates instead of batch posteriors (default: False)
+            online: If True, return skill before each match (prediction).
+                If False (default), return smoothed posteriors.
+            posterior: If True (and online=True), return skill after each match
+                without future information (filtered). Ignored when online=False.
         
         Returns:
             dict: Maps player names to lists of (time, skill) tuples
@@ -1169,7 +1172,9 @@ class History(object):
             time = h.btimes[b]
             for name in h.bskills[b]:
                 if (who is None) or (name in who):
-                    if self.online and online:
+                    if self.online and online and posterior:
+                        skill = h.bskills[b][name].forward_posterior
+                    elif self.online and online:
                         skill = h.bskills[b][name].online
                     else:
                         skill = h.bskills[b][name].posterior
