@@ -779,6 +779,7 @@ class Skill(object):
         self.backward = backward
         self.likelihoods = likelihoods
         self.online = None
+        self.online_posterior = None
 
     def __repr__(self):
         """String representation of the Skill."""
@@ -818,7 +819,8 @@ class Skill(object):
             'forward': (self.forward.mu, self.forward.sigma),
             'backward': (self.backward.mu, self.backward.sigma),
             'likelihoods': [(l.mu, l.sigma) for l in self.likelihoods],
-            'online': None if not self.online else (self.online.mu, self.online.sigma)
+            'online': None if not self.online else (self.online.mu, self.online.sigma),
+            'online_posterior': None if self.online_posterior is None else (self.online_posterior.mu, self.online_posterior.sigma)
         }
 
 from enum import Enum
@@ -1139,6 +1141,11 @@ class History(object):
                 step = self.iteration(); delta = max(step)
                 i += 1
                 if verbose: print(", step = ", step)
+            if self.online and self.b_until > 0:
+                b_curr = self.b_until - 1
+                for n_p in self.bskills[b_curr]:
+                    if self.bskills[b_curr][n_p].online_posterior is None:
+                        self.bskills[b_curr][n_p].online_posterior = self.bskills[b_curr][n_p].forward_posterior
             self.unveil_batch()
         return step, i
 
@@ -1173,7 +1180,9 @@ class History(object):
             for name in h.bskills[b]:
                 if (who is None) or (name in who):
                     if self.online and online and posterior:
-                        skill = h.bskills[b][name].forward_posterior
+                        skill = h.bskills[b][name].online_posterior
+                        if skill is None:
+                            skill = h.bskills[b][name].forward_posterior
                     elif self.online and online:
                         skill = h.bskills[b][name].online
                     else:
@@ -1259,6 +1268,8 @@ class History(object):
                 )
                 if skill_dict['online'] is not None:
                     bskill[name].online = Gaussian(*skill_dict['online'])
+                if skill_dict.get('online_posterior') is not None:
+                    bskill[name].online_posterior = Gaussian(*skill_dict['online_posterior'])
 
         # Restore None values for unpickleable attributes
         state['_last_message'] = None
